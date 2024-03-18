@@ -1,6 +1,6 @@
 # TJWB
 Python library used to calculate reservoir water balance.
-#### Version: 1.0.0
+#### Version: 1.0.1
 ### Installation
 ```
 pip install tjwb

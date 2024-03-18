@@ -9,7 +9,7 @@ with open(path.join(HERE, 'README.md'), encoding='utf-8') as f:
 setup(
     name='tjwb',
     packages=find_packages(include=['tjwb']),
-    version='1.0.1',
+    version='1.1.1',
     description='Python library used to calculate reservoir water balance.',
     long_description=long_description,
     long_description_content_type="text/markdown",

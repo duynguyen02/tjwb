@@ -133,12 +133,14 @@ def _to_zero_if_nan_or_negative(series: pd.Series):
 
 @dataclasses.dataclass
 class TJWBResult:
+    datetime: pd.Series
     inflow_speed: pd.Series
     outflow_speed: pd.Series
     components_outflow_speed: Dict[str, pd.Series]
 
     def to_dataframe(self):
         data = {
+            'datetime': self.datetime,
             'inflow_speed': self.inflow_speed,
             'outflow_speed': self.outflow_speed
         }
@@ -274,6 +276,7 @@ def calculate(
     outflow_speed_series = _to_zero_if_nan_or_negative(outflow_speed_series)
 
     return TJWBResult(
+        datetime=df[required_columns_name.datetime],
         inflow_speed=inflow_speed_series,
         outflow_speed=outflow_speed_series,
         components_outflow_speed=components_outflow_speed

@@ -113,7 +113,7 @@ print(result_df)
 ## Main Classes and Functions
 
 - **`calculate`**: The main function for calculating the inflow and outflow speeds based on the given configurations.
-- **`TJWBResult`**: Holds the calculated results, including inflow speed, outflow speed, and outflow speeds for each
+- **`TJWBResult`**: Holds the calculated results, including datetime, inflow speed, outflow speed, and outflow speeds for each
   component.
 - **`RequiredColumnsName`**: Configuration for the required column names in the input DataFrame.
 - **`WaterLevelCapacityMappingColumnsName`**: Configuration for the column names in the water level-capacity mapping

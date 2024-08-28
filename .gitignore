@@ -12,3 +12,4 @@ static
 assets
 main.ipynb
 .venv
+.idea

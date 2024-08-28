@@ -1,72 +1,109 @@
-# TJWB
-Python library used to calculate reservoir water balance.
-#### Version: 1.1.1
-### Installation
-```
+# tjwb
+
+`tjwb` is a Python library designed for water balance management in reservoirs. The library provides methods to
+calculate inflow and outflow speeds of various components, such as pumps, box culverts, and valve overflows, based on
+water level and configuration.
+
+## Installation
+
+To install the library, use pip:
+
+```bash
 pip install tjwb
 ```
 
-### Get started
-#### The datasets that need to be prepared:
-The dataset for correlating water level and reservoir capacity. The dataset includes two columns: Elevation and Storage.
+## Usage
 
-| Elevation | Storage |
-|-----------|---------|
-| 19.00     | 0.000   |
-| 19.01     | 0.000   |
-| 19.02     | 0.001   |
-| 19.03     | 0.001   |
-| ...     | ...   |
+### Basic Example
 
-
-The dataset contains time-series data with the following columns:
-
-- `timestamp`: indicating the time of observation
-- `water_level`: measured water level
-- `boxdrain_<id>`: the opening degree of box drains (in meters), which may include multiple columns for different box drain IDs
-- `valveoverflow_<id>`: the opening degree of valve overflow (in meters), which may include multiple columns for different valve overflow IDs
-- `pump_<id>`: discharge rate of pumps (in m^3/s), which may include multiple columns for different pump IDs.
-
-
-| timestamp  | water_level | boxdrain_cong1 | valveoverflow_tran1 | valveoverflow_tran2 | valveoverflow_tran3 | pump_01 |
-|------------|-------------|----------------|---------------------|---------------------|---------------------|---------|
-| 2014-01-01 | 25          | 0              | 0                   | 0                   | 0                   | 12      |
-| 2014-01-02 | 25          | 0              | 0                   | 0                   | 0                   | 12      |
-| 2014-01-03 | 25          | 0              | 0                   | 0                   | 0                   | 12      |
-| 2014-01-04 | 25          | 0              | 0                   | 0                   | 0                   | 12      |
-| 2014-01-05 | 25          | 0              | 0                   | 0                   | 0                   | 12      |
-
-#### How to use TJWB to calculate water balance.
-```Python
+```python
 import pandas as pd
-from tjwb import wb
+from tjwb import (calculate, RequiredColumnsName, WaterLevelCapacityMappingColumnsName, PumpConfig, ValveOverflowConfig,
+                  BoxCulvertConfig)
 
-pre_df = pd.read_csv('data_example.csv')
-ets_df = pd.read_csv('elevation_to_storage_example.csv')
+# Prepare your data
+df = pd.DataFrame({
+    'Datetime': ['2024-08-28 10:00:00', '2024-08-28 10:05:00'],
+    'Water Level': [5.0, 5.5],
+    'Pump.Pump-1': [1.0, 1.5],
+    'BoxCulvert.BoxCulvert-1': [0.5, 0.7],
+    'ValveOverflow.ValveOverflow-1': [0.3, 0.4],
+    'ValveOverflow.ValveOverflow-2': [0.3, 0.4],
+    'ValveOverflow.ValveOverflow-3': [0.3, 0.4],
+})
 
-wb = wb.WB(
-    ets_df,
-    22.5, # boxdrain_elevation
-    0.7, # boxdrain_height
-    22, # valveoverflow_elevation
-    3 # valveoverflow_height
+water_level_capacity_mapping_df = pd.DataFrame({
+    'Water Level': [5.0, 5.5],
+    'Capacity': [1000, 1500]
+})
+
+# Define component configurations
+pump_configs = [PumpConfig(column_name_prefix='Pump')]
+box_culvert_configs = [BoxCulvertConfig(column_name_prefix='BoxCulvert', elevation=2.0, height=1.0)]
+valve_overflow_configs = [ValveOverflowConfig(column_name_prefix='ValveOverflow', elevation=1.5, height=0.5)]
+
+# Calculate results
+result = calculate(
+    _df=df,
+    _water_level_capacity_mapping_df=water_level_capacity_mapping_df,
+    water_level_capacity_mapping_columns_name=WaterLevelCapacityMappingColumnsName(),
+    required_columns_name=RequiredColumnsName(),
+    pump_configs=pump_configs,
+    box_culvert_configs=box_culvert_configs,
+    valve_overflow_configs=valve_overflow_configs
 )
 
-df = wb.calculate(
-    pre_df,
-    3 # round to
-)
+# Convert results to DataFrame
+result_df = result.to_dataframe()
+print(result_df)
 ```
-#### The result may be as follows:
-| timestamp   | water_level | boxdrain_cong1 | valveoverflow_tran1 | valveoverflow_tran2 | valveoverflow_tran3 | pump_01 | delta_T | storage | Q_out_total | boxdrainOutflow_cong1 | valveoverflowOutflow_tran1 | valveoverflowOutflow_tran2 | valveoverflowOutflow_tran3 | Q_in   |
-|-------------|-------------|----------------|---------------------|---------------------|---------------------|---------|---------|---------|-------------|-----------------------|-----------------------------|-----------------------------|-----------------------------|---------|
-| 2014-01-01  | 25.00       | 0              | 0                   | 0                   | 0                   | 12      | 0.0     | 2.22    | 12.000      | 0.000                 | 0.0                         | 0.0                         | 0.0                         | 0.000   |
-| 2014-01-02  | 25.00       | 0              | 0                   | 0                   | 0                   | 12      | 86400.0 | 2.22    | 12.000      | 0.000                 | 0.0                         | 0.0                         | 0.0                         | 12.000  |
-| 2014-01-03  | 25.00       | 0              | 0                   | 0                   | 0                   | 12      | 86400.0 | 2.22    | 12.000      | 0.000                 | 0.0                         | 0.0                         | 0.0                         | 12.000  |
-| 2014-01-04  | 25.00       | 0              | 0                   | 0                   | 0                   | 12      | 86400.0 | 2.22    | 12.000      | 0.000                 | 0.0                         | 0.0                         | 0.0                         | 12.000  |
-| 2014-01-05  | 25.00       | 0              | 0                   | 0                   | 0                   | 12      | 86400.0 | 2.22    | 12.000      | 0.000                 | 0.0                         | 0.0                         | 0.0                         | 12.000  |
-| ...  | ...       | ...              | ...                   | ...                   | ...                   | ...      | ... | ...    | ...      | ...                 | ...                         | ...                         | ...                         | ...  |
 
+## Main Classes and Functions
 
-### Functions to be developed in the future:
-- Establish calculation for other types of drains, overflows, etc.
+- **`calculate`**: The main function for calculating the inflow and outflow speeds based on the given configurations.
+- **`TJWBResult`**: Holds the calculated results, including inflow speed, outflow speed, and outflow speeds for each
+  component.
+- **`RequiredColumnsName`**: Configuration for the required column names in the input DataFrame.
+- **`WaterLevelCapacityMappingColumnsName`**: Configuration for the column names in the water level-capacity mapping
+  DataFrame.
+- **Component Configurations**:
+    - `PumpConfig`
+    - `BoxCulvertConfig`
+    - `ValveOverflowConfig`
+
+## Error Handling
+
+The `tjwb` library includes various validation steps to ensure that the inputs are correct. Below are the common
+scenarios where errors might be raised:
+
+- **Invalid DataFrame Structure**:
+    - If the main DataFrame (`_df`) or the Water Level Capacity Mapping DataFrame (`_water_level_capacity_mapping_df`)
+      contains missing required columns, a `ValueError` will be raised.
+    - If the Water Level Capacity Mapping DataFrame contains non-numeric data in the `water_level` or `capacity`
+      columns, a `TypeError` will be raised.
+    - If any required column in the main DataFrame contains null values, a `ValueError` will be raised.
+    - If the `Datetime` column cannot be converted to a valid datetime format, a `ValueError` will be raised.
+
+- **Component Configuration Errors**:
+    - If the `column_name_prefix` of any component contains the character `'.'`, a `ValueError` will be raised, as this
+      character is not allowed in column name prefixes.
+    - If there are duplicate `column_name_prefix` values among the configured components, a `ValueError` will be raised.
+    - If a column referenced in the component configuration does not exist or is not of numeric type, a `TypeError` will
+      be raised.
+
+- **Invalid Water Level to Capacity Mapping**:
+    - If there is a mismatch between the water levels in the main DataFrame and the Water Level Capacity Mapping
+      DataFrame, such that no valid capacity can be mapped, a `ValueError` will be raised.
+
+- **Calculation Errors**:
+    - If the calculated inflow or outflow speeds result in negative or NaN values, the library automatically converts
+      these to zero using internal validation functions.
+
+## License
+
+This library is released under the MIT License.
+
+## Contact
+
+If you have any questions or issues, please open an issue on [GitHub](https://github.com/duynguyen02/tjwb/issues) or
+email us at [duynguyen02.dev@gmail.com](mailto:duynguyen02.dev@gmail.com).

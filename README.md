@@ -1,8 +1,60 @@
 # tjwb
 
 `tjwb` is a Python library designed for water balance management in reservoirs. The library provides methods to
-calculate inflow and outflow speeds of various components, such as pumps, box culverts, and valve overflows, based on
-water level and configuration.
+calculate inflow and outflow speeds of various components, such as pumps, box culverts, and valve overflows, based on water level and configuration.
+
+## Overview
+
+```
+Subsequent Capacity = Previous Capacity + (Inflow Speed * ΔT) - (Outflow Speed * ΔT)
+```
+
+Where:
+
+- **Subsequent Capacity**: The capacity of the reservoir after the current time step.
+- **Previous Capacity**: The capacity of the reservoir before the current time step.
+- **Inflow Speed**: The rate at which water is entering the reservoir.
+- **Outflow Speed**: The rate at which water is leaving the reservoir.
+- **ΔT**: The time step or interval over which the inflow and outflow are measured.
+
+If the difference between the subsequent capacity and the previous capacity is zero, then the inflow speed and outflow speed
+are equal:
+
+```
+Subsequent Capacity - Previous Capacity = 0
+```
+
+In this case:
+
+```
+Inflow Speed = Outflow Speed
+```
+
+If the difference between the subsequent capacity and the previous capacity is negative, then the outflow speed is greater
+than the inflow speed:
+
+```
+Subsequent Capacity - Previous Capacity < 0
+```
+
+In this case:
+
+```
+Outflow Speed > Inflow Speed
+```
+
+Conversely, if the difference between the subsequent capacity and the previous capacity is positive, then the inflow speed
+is greater than the outflow speed:
+
+```
+Subsequent Capacity - Previous Capacity > 0
+```
+
+In this case:
+
+```
+Inflow Speed > Outflow Speed
+```
 
 ## Installation
 

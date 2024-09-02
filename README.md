@@ -1,4 +1,5 @@
 # tjwb
+![PyPI - Version](https://img.shields.io/pypi/v/tjwb)
 
 `tjwb` is a Python library designed for water balance management in reservoirs. The library provides methods to
 calculate inflow and outflow speeds of various components, such as pumps, box culverts, and valve overflows, based on water level and configuration...

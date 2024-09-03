@@ -156,6 +156,7 @@ def calculate(
         pump_configs: Optional[List[PumpConfig]] = None,
         valve_overflow_configs: Optional[List[ValveOverflowConfig]] = None,
         box_culvert_configs: Optional[List[BoxCulvertConfig]] = None,
+        nearest_mapping: bool = False,
 ):
     # normalize _water_level_capacity_mapping_df
     wlcm_df = _validate_water_level_capacity_mapping_df(
@@ -220,6 +221,55 @@ def calculate(
             water_level_capacity_mapping_columns_name.water_level
         )[water_level_capacity_mapping_columns_name.capacity]
     )
+
+    if nearest_mapping:
+        def fill_capacity(row, df_mapping):
+            if pd.notna(row[water_level_capacity_mapping_columns_name.capacity]):
+                return row[water_level_capacity_mapping_columns_name.capacity]
+
+            water_level = row[required_columns_name.water_level]
+
+            min_water_level = df_mapping[water_level_capacity_mapping_columns_name.water_level].min()
+            max_water_level = df_mapping[water_level_capacity_mapping_columns_name.water_level].max()
+
+            if water_level > max_water_level:
+                return df_mapping.loc[
+                    df_mapping[
+                        water_level_capacity_mapping_columns_name.water_level
+                    ] == max_water_level,
+                    water_level_capacity_mapping_columns_name.capacity
+                ].values[0]
+
+            if water_level < min_water_level:
+                return df_mapping.loc[
+                    df_mapping[
+                        water_level_capacity_mapping_columns_name.water_level
+                    ] == min_water_level,
+                    water_level_capacity_mapping_columns_name.capacity
+                ].values[
+                    0]
+
+            lower = df_mapping[df_mapping[water_level_capacity_mapping_columns_name.water_level] < water_level][
+                water_level_capacity_mapping_columns_name.water_level].max()
+            upper = df_mapping[df_mapping[water_level_capacity_mapping_columns_name.water_level] > water_level][
+                water_level_capacity_mapping_columns_name.water_level].min()
+
+            if (water_level - lower) <= (upper - water_level):
+                return df_mapping.loc[
+                    df_mapping[
+                        water_level_capacity_mapping_columns_name.water_level
+                    ] == lower,
+                    water_level_capacity_mapping_columns_name.capacity
+                ].values[0]
+            else:
+                return df_mapping.loc[
+                    df_mapping[
+                        water_level_capacity_mapping_columns_name.water_level
+                    ] == upper,
+                    water_level_capacity_mapping_columns_name.capacity
+                ].values[0]
+
+        df[water_level_capacity_mapping_columns_name.capacity] = df.apply(fill_capacity, axis=1, df_mapping=wlcm_df)
 
     if df.isnull().any().any():
         raise ValueError("The data DataFrame contains invalid water level does not match mapping Dataframe.")

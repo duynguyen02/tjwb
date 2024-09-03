@@ -176,3 +176,33 @@ def test_calculate_with_box_culvert_and_valve_overflow():
 
     assert isclose(result.outflow_speed.sum(), sum(result.outflow_speed), rel_tol=1e-5)
     assert len(result.components_outflow_speed) == 2
+
+
+def test_calculate_with_nearest_mapping():
+    df = pd.DataFrame({
+        'Datetime': pd.date_range('2023-01-01', periods=5, freq='h'),
+        'Water Level': [1.5, 2.0, 2.5, 3.0, 3.4],  # Invalid WaterLevel
+        'BoxCulvert.Opening': [1, 1, 1, 1, 1],
+        'ValveOverflow.Opening': [1, 1, 1, 1, 1]
+    })
+
+    water_level_capacity_mapping_df = pd.DataFrame({
+        'Water Level': [1.5, 2.0, 2.5, 3.0, 3.5],
+        'Capacity': [200, 300, 400, 500, 600]
+    })
+
+    box_culvert_configs = [BoxCulvertConfig(column_name_prefix='BoxCulvert', elevation=1.0, height=2.0)]
+    valve_overflow_configs = [ValveOverflowConfig(column_name_prefix='ValveOverflow', elevation=1.0, height=2.0)]
+
+    result = calculate(
+        df,
+        water_level_capacity_mapping_df,
+        WaterLevelCapacityMappingColumnsName(),
+        RequiredColumnsName(),
+        box_culvert_configs=box_culvert_configs,
+        valve_overflow_configs=valve_overflow_configs,
+        nearest_mapping=True
+    )
+
+    assert isclose(result.outflow_speed.sum(), sum(result.outflow_speed), rel_tol=1e-5)
+    assert len(result.components_outflow_speed) == 2

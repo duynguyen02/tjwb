@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "tjwb"
-version = "2.1.0"
+version = "2.2.0"
 description = "Python library used to calculate reservoir water balance."
 authors = ["Duy Nguyen <duynguyen02.dev@gmail.com>"]
 readme = "README.md"

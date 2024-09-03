@@ -136,13 +136,17 @@ class TJWBResult:
     datetime: pd.Series
     inflow_speed: pd.Series
     outflow_speed: pd.Series
+    water_level: pd.Series
+    capacity: pd.Series
     components_outflow_speed: Dict[str, pd.Series]
 
     def to_dataframe(self):
         data = {
             'datetime': self.datetime,
             'inflow_speed': self.inflow_speed,
-            'outflow_speed': self.outflow_speed
+            'outflow_speed': self.outflow_speed,
+            'water_level': self.water_level,
+            'capacity': self.capacity,
         }
         data.update(self.components_outflow_speed)
         return pd.DataFrame(data)
@@ -329,5 +333,7 @@ def calculate(
         datetime=df[required_columns_name.datetime],
         inflow_speed=inflow_speed_series,
         outflow_speed=outflow_speed_series,
+        water_level=df[required_columns_name.water_level],
+        capacity=df[water_level_capacity_mapping_columns_name.capacity],
         components_outflow_speed=components_outflow_speed
     )

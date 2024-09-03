@@ -103,7 +103,8 @@ result = calculate(
     required_columns_name=RequiredColumnsName(),
     pump_configs=pump_configs,
     box_culvert_configs=box_culvert_configs,
-    valve_overflow_configs=valve_overflow_configs
+    valve_overflow_configs=valve_overflow_configs,
+    nearest_mapping=True # ^2.2.0
 )
 
 # Convert results to DataFrame
@@ -114,7 +115,7 @@ print(result_df)
 ## Main Classes and Functions
 
 - **`calculate`**: The main function for calculating the inflow and outflow speeds based on the given configurations.
-- **`TJWBResult`**: Holds the calculated results, including datetime, inflow speed, outflow speed, and outflow speeds for each
+- **`TJWBResult`**: Holds the calculated results, including datetime, water level, capacity, inflow speed, outflow speed, and outflow speeds for each
   component.
 - **`RequiredColumnsName`**: Configuration for the required column names in the input DataFrame.
 - **`WaterLevelCapacityMappingColumnsName`**: Configuration for the column names in the water level-capacity mapping

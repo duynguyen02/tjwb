@@ -1,18 +1,19 @@
 [tool.poetry]
 name = "tjwb"
-version = "2.2.0"
-description = "Python library used to calculate reservoir water balance."
+version = "3.0.0"
+description = "Python library for reservoir water balance calculations."
 authors = ["Duy Nguyen <duynguyen02.dev@gmail.com>"]
 readme = "README.md"
 repository = "https://github.com/duynguyen02/tjwb"
 
+
 [tool.poetry.dependencies]
 python = "^3.9"
-pandas = "^2.2.2"
+pandas = "^2.2.3"
 
 
-[tool.poetry.group.test.dependencies]
-pytest = "^8.3.2"
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.3"
 
 [build-system]
 requires = ["poetry-core"]

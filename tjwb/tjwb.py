@@ -1,101 +1,76 @@
-import dataclasses
 import math
-import uuid
-from typing import Optional, List, Dict
+from typing import Dict, Optional
 
+import numpy as np
 import pandas as pd
 
-
-@dataclasses.dataclass
-class RequiredColumnsName:
-    datetime: str = 'Datetime'
-    water_level: str = 'Water Level'
+from .columns_constant import *
+from .dataset import Dataset, ComponentConfig
 
 
-# # # COMPONENTS # # #
-@dataclasses.dataclass
-class ComponentConfig:
-    column_name_prefix: str
+def dataset_to_dataframe(dataset: Dataset):
+    dataset_dict = {
+        TIME_SERIES: dataset.get_time_series(),
+        WATER_LEVEL: dataset.get_water_level(),
+    }
+    for pump_id, values in dataset.get_pumps().items():
+        dataset_dict[f'{PUMP}.{pump_id}'] = values
+
+    for box_culvert_id, (config, values) in dataset.get_box_culverts().items():
+        dataset_dict[f'{BOX_CULVERT}.{box_culvert_id}'] = values
+
+    for valve_overflow_id, (config, values) in dataset.get_valve_overflows().items():
+        for i, val in enumerate(values):
+            dataset_dict[f'{VALVE_OVERFLOW}.{valve_overflow_id}.{i}'] = val
+
+    df = pd.DataFrame(dataset_dict)
+    df[TIME_SERIES] = pd.to_datetime(df[TIME_SERIES])
+    return df
 
 
-@dataclasses.dataclass
-class EHComponentConfig(ComponentConfig):
-    elevation: float
-    height: float
+def validate_time_series(df: pd.DataFrame):
+    if not df[TIME_SERIES].is_monotonic_increasing:
+        raise ValueError("The time series is not strictly increasing.")
+
+    time_diffs = df[TIME_SERIES].diff().dropna()
+    if not time_diffs.nunique() == 1:
+        raise ValueError("The intervals between datetimes are not consistent.")
 
 
-@dataclasses.dataclass
-class PumpConfig(ComponentConfig):
-    pass
+def validate_columns_size(df: pd.DataFrame):
+    time_series_size = len(df[TIME_SERIES])
+    for column in df.columns:
+        if column != TIME_SERIES and df[column].count() != time_series_size:
+            raise ValueError(f"The column '{column}' does not have the same size as the 'TimeSeries' column.")
 
 
-@dataclasses.dataclass
-class ValveOverflowConfig(EHComponentConfig):
-    pass
+def validate_dataframe(df: pd.DataFrame):
+    validate_time_series(df)
+    validate_columns_size(df)
 
 
-@dataclasses.dataclass
-class BoxCulvertConfig(EHComponentConfig):
-    pass
+def get_capacity(water_level: float, water_level_capacity_map: Dict[float, float], nearest_mapping: bool):
+    if water_level in water_level_capacity_map:
+        return water_level_capacity_map[water_level]
+
+    if nearest_mapping:
+        nearest_key = min(water_level_capacity_map.keys(), key=lambda x: abs(x - water_level))
+        return water_level_capacity_map[nearest_key]
+
+    return np.nan
 
 
-# # # COMPONENTS # # #
-
-
-@dataclasses.dataclass
-class WaterLevelCapacityMappingColumnsName:
-    water_level: str = 'Water Level'
-    capacity: str = 'Capacity'
-
-
-def _validate_components_config(components_config: List[ComponentConfig]):
-    all_prefixes = []
-    for component_config in components_config:
-        all_prefixes.append(component_config.column_name_prefix)
-        if '.' in component_config.column_name_prefix:
-            raise ValueError(
-                f"Data column name prefix must not contain '.' character: {component_config.column_name_prefix} "
-            )
-    if len(all_prefixes) != len(set(all_prefixes)):
-        raise ValueError("The list contains duplicate prefixes.")
-
-
-def _validate_water_level_capacity_mapping_df(
-        _df: pd.DataFrame,
-        water_level_capacity_mapping_columns_name: WaterLevelCapacityMappingColumnsName,
-):
-    wlcm_cn = water_level_capacity_mapping_columns_name
-    wlcm_df = _df.copy()
-
-    required_columns = [wlcm_cn.capacity, wlcm_cn.water_level]
-
-    missing_columns = [col for col in required_columns if col not in wlcm_df.columns]
-    if missing_columns:
+def map_capacity(df: pd.DataFrame, water_level_capacity_map: Dict[float, float], nearest_mapping: bool):
+    df = df.copy()
+    df[CAPACITY] = df[WATER_LEVEL].apply(lambda x: get_capacity(x, water_level_capacity_map, nearest_mapping))
+    if df[CAPACITY].isna().any():
         raise ValueError(
-            f"The Water Level Capacity Mapping DataFrame"
-            f"needs to have the following columns: {', '.join(missing_columns)}"
-        )
-
-    for col in required_columns:
-        if not pd.api.types.is_numeric_dtype(wlcm_df[col]):
-            raise TypeError(f"Column '{col}' must be of type float.")
-
-    if wlcm_df[required_columns].isnull().any().any():
-        raise ValueError("There are missing values in one or more of the required columns.")
-
-    return wlcm_df[required_columns]
+            "There are missing values in the 'Capacity' column. Consider setting 'nearest_mapping=True' "
+            "to fill missing values with the nearest available capacity.")
+    return df
 
 
-def _count_decimal_places(number: float):
-    number_str = str(number)
-    if '.' in number_str:
-        decimal_part = number_str.split('.')[1]
-        return len(decimal_part)
-    else:
-        return 0
-
-
-def _calculate_box_culvert_outflow(
+def calculate_box_culvert_outflow(
         water_level: float,
         elevation: float,
         height: float,
@@ -110,7 +85,7 @@ def _calculate_box_culvert_outflow(
         return 0.36 * height * math.sqrt(2 * 9.81 * (water_level - elevation) ** 3)
 
 
-def _calculate_valve_overflow_outflow(
+def calculate_valve_overflow_outflow(
         water_level: float,
         elevation: float,
         height: float,
@@ -125,215 +100,82 @@ def _calculate_valve_overflow_outflow(
         return 0.36 * height * math.sqrt(2 * 9.81 * (water_level - elevation) ** 3)
 
 
-def _to_zero_if_nan_or_negative(series: pd.Series):
-    series = series.fillna(0)
-    series = series.apply(lambda x: 0 if x < 0 else x)
-    return series
+def calculate_pumps_outflow(df: pd.DataFrame):
+    df = df.copy()
+    for index, row in df.iterrows():
+        pump_columns = [col for col in df.columns if col.startswith(PUMP)]
+        outflow_sum = sum(row[pump] for pump in pump_columns)
+        df.at[index, OUTFLOW] = outflow_sum
+    return df
 
 
-@dataclasses.dataclass
-class TJWBResult:
-    datetime: pd.Series
-    inflow_speed: pd.Series
-    outflow_speed: pd.Series
-    water_level: pd.Series
-    capacity: pd.Series
-    components_outflow_speed: Dict[str, pd.Series]
+def calculate_box_culverts_outflow(df: pd.DataFrame, dataset: Dataset):
+    df = df.copy()
+    for col in df.columns:
+        if col.startswith(BOX_CULVERT):
+            valve_overflow_id = col.split(".")[1]
+            outflow_column_name = f'{OUT_BOX_CULVERT}.{valve_overflow_id}'
 
-    def to_dataframe(self):
-        data = {
-            'datetime': self.datetime,
-            'inflow_speed': self.inflow_speed,
-            'outflow_speed': self.outflow_speed,
-            'water_level': self.water_level,
-            'capacity': self.capacity,
-        }
-        data.update(self.components_outflow_speed)
-        return pd.DataFrame(data)
+            cfg, _ = dataset.get_box_culverts().get(valve_overflow_id)
+            cfg: ComponentConfig
+
+            for index, row in df.iterrows():
+                water_level = row[WATER_LEVEL]
+                opening_value = row[col]
+                outflow = calculate_box_culvert_outflow(water_level, cfg.elevation, cfg.height, opening_value)
+
+                df.at[index, outflow_column_name] = outflow
+                df.at[index, OUTFLOW] += outflow
+    return df
+
+
+def calculate_valve_overflows_outflow(df: pd.DataFrame, dataset: Dataset):
+    df = df.copy()
+    for col in df.columns:
+        if col.startswith(VALVE_OVERFLOW):
+            valve_overflow_id = col.split(".")[1]
+            valve_overflow_port = col.split(".")[2]
+            outflow_column_name = f'{OUT_VALVE_OVERFLOW}.{valve_overflow_id}.{valve_overflow_port}'
+
+            cfg, _ = dataset.get_valve_overflows().get(valve_overflow_id)
+            cfg: ComponentConfig
+
+            for index, row in df.iterrows():
+                water_level = row[WATER_LEVEL]
+                opening_value = row[col]
+                outflow = calculate_valve_overflow_outflow(water_level, cfg.elevation, cfg.height, opening_value)
+
+                df.at[index, outflow_column_name] = outflow
+                df.at[index, OUTFLOW] += outflow
+    return df
 
 
 def calculate(
-        _df: pd.DataFrame,
-        _water_level_capacity_mapping_df: pd.DataFrame,
-        water_level_capacity_mapping_columns_name: WaterLevelCapacityMappingColumnsName,
-        required_columns_name: RequiredColumnsName,
-        pump_configs: Optional[List[PumpConfig]] = None,
-        valve_overflow_configs: Optional[List[ValveOverflowConfig]] = None,
-        box_culvert_configs: Optional[List[BoxCulvertConfig]] = None,
-        nearest_mapping: bool = False,
+        dataset: Dataset,
+        water_level_capacity_map: Dict[float, float],
+        round_to: Optional[int] = None,
+        nearest_mapping: bool = False
 ):
-    # normalize _water_level_capacity_mapping_df
-    wlcm_df = _validate_water_level_capacity_mapping_df(
-        _water_level_capacity_mapping_df,
-        water_level_capacity_mapping_columns_name,
-    )
+    # # # prepare data # # #
+    df = dataset_to_dataframe(dataset)
+    validate_dataframe(df)
 
-    # calculate max decimal places for easy reference
-    capacity_max_decimal_places = wlcm_df[
-        water_level_capacity_mapping_columns_name.capacity].apply(_count_decimal_places).max()
-    water_level_max_decimal_places = wlcm_df[
-        water_level_capacity_mapping_columns_name.water_level].apply(_count_decimal_places).max()
+    if round_to is not None:
+        water_level_capacity_map = {round(key, round_to): value for key, value in water_level_capacity_map.items()}
+        df[WATER_LEVEL] = df[WATER_LEVEL].round(round_to)
 
-    """
-    WARNING: Edit this block of code to remove or add components that need to be calculated.
-    """
-    if pump_configs is None:
-        pump_configs = []
-    if valve_overflow_configs is None:
-        valve_overflow_configs = []
-    if box_culvert_configs is None:
-        box_culvert_configs = []
-    components_config = pump_configs + valve_overflow_configs + box_culvert_configs
+    df = map_capacity(df, water_level_capacity_map, nearest_mapping)
+    df[INTERVAL] = df[TIME_SERIES].diff().dt.total_seconds().fillna(0)
 
-    # at least 1 component
-    if len(components_config) == 0:
-        raise ValueError(
-            "There are no components configured. "
-        )
+    # # # calculate # # #
+    df[OUTFLOW] = 0.0
+    df = calculate_pumps_outflow(df)
+    df = calculate_box_culverts_outflow(df, dataset)
+    df = calculate_valve_overflows_outflow(df, dataset)
+    df[INFLOW] = ((df[OUTFLOW] * df[INTERVAL]) + (
+        df[CAPACITY].diff()) * 10 ** 6) / (df[INTERVAL])
 
-    _validate_components_config(components_config)
+    df[INFLOW] = df[INFLOW].apply(lambda x: x if x >= 0 else 0).fillna(0)
+    df[OUTFLOW] = df[OUTFLOW].apply(lambda x: x if x >= 0 else 0).fillna(0)
 
-    df = _df.copy()
-
-    if df.isnull().any().any():
-        raise ValueError("The DataFrame contains null values.")
-
-    # convert to datetime
-    try:
-        df[required_columns_name.datetime] = pd.to_datetime(
-            df[required_columns_name.datetime],
-            utc=True
-        )
-    except Exception as _:
-        raise ValueError(
-            "Cannot convert date column to datetime. "
-        )
-
-    # calculate delta T
-    delta_t_column_name = f'{uuid.uuid4().hex}_delta_t'
-    df[delta_t_column_name] = df[required_columns_name.datetime].diff().dt.total_seconds().fillna(0)
-
-    df[required_columns_name.water_level] = round(
-        df[required_columns_name.water_level],
-        water_level_max_decimal_places
-    )
-
-    df[water_level_capacity_mapping_columns_name.capacity] = df[
-        required_columns_name.water_level
-    ].map(
-        wlcm_df.set_index(
-            water_level_capacity_mapping_columns_name.water_level
-        )[water_level_capacity_mapping_columns_name.capacity]
-    )
-
-    if nearest_mapping:
-        def fill_capacity(row, df_mapping):
-            if pd.notna(row[water_level_capacity_mapping_columns_name.capacity]):
-                return row[water_level_capacity_mapping_columns_name.capacity]
-
-            water_level = row[required_columns_name.water_level]
-
-            min_water_level = df_mapping[water_level_capacity_mapping_columns_name.water_level].min()
-            max_water_level = df_mapping[water_level_capacity_mapping_columns_name.water_level].max()
-
-            if water_level > max_water_level:
-                return df_mapping.loc[
-                    df_mapping[
-                        water_level_capacity_mapping_columns_name.water_level
-                    ] == max_water_level,
-                    water_level_capacity_mapping_columns_name.capacity
-                ].values[0]
-
-            if water_level < min_water_level:
-                return df_mapping.loc[
-                    df_mapping[
-                        water_level_capacity_mapping_columns_name.water_level
-                    ] == min_water_level,
-                    water_level_capacity_mapping_columns_name.capacity
-                ].values[
-                    0]
-
-            lower = df_mapping[df_mapping[water_level_capacity_mapping_columns_name.water_level] < water_level][
-                water_level_capacity_mapping_columns_name.water_level].max()
-            upper = df_mapping[df_mapping[water_level_capacity_mapping_columns_name.water_level] > water_level][
-                water_level_capacity_mapping_columns_name.water_level].min()
-
-            if (water_level - lower) <= (upper - water_level):
-                return df_mapping.loc[
-                    df_mapping[
-                        water_level_capacity_mapping_columns_name.water_level
-                    ] == lower,
-                    water_level_capacity_mapping_columns_name.capacity
-                ].values[0]
-            else:
-                return df_mapping.loc[
-                    df_mapping[
-                        water_level_capacity_mapping_columns_name.water_level
-                    ] == upper,
-                    water_level_capacity_mapping_columns_name.capacity
-                ].values[0]
-
-        df[water_level_capacity_mapping_columns_name.capacity] = df.apply(fill_capacity, axis=1, df_mapping=wlcm_df)
-
-    if df.isnull().any().any():
-        raise ValueError("The data DataFrame contains invalid water level does not match mapping Dataframe.")
-
-    num_of_elements = df.shape[0]
-
-    # store component results
-    components_outflow_speed = {}
-    inflow_speed_series = pd.Series([0] * num_of_elements)
-    outflow_speed_series = pd.Series([0] * num_of_elements)
-
-    # calculate each components
-    for component_config in components_config:
-        for col in df.columns:
-            if col.startswith(f'{component_config.column_name_prefix}.'):
-
-                if not pd.api.types.is_numeric_dtype(df[col]):
-                    raise TypeError(f"Column '{col}' must be of type numeric.")
-
-                """
-                WARNING: Edit this block of code to remove or add components that need to be calculated.
-                """
-                result = None
-                if isinstance(component_config, PumpConfig):
-                    result = df[col]
-
-                if isinstance(component_config, BoxCulvertConfig):
-                    result = pd.Series([
-                        _calculate_box_culvert_outflow(wl, component_config.elevation, component_config.height, ov)
-                        for wl, ov in zip(df[required_columns_name.water_level], df[col])
-                    ])
-
-                if isinstance(component_config, ValveOverflowConfig):
-                    result = pd.Series([
-                        _calculate_valve_overflow_outflow(wl, component_config.elevation, component_config.height, ov)
-                        for wl, ov in zip(df[required_columns_name.water_level], df[col])
-                    ])
-
-                if result is None:
-                    raise TypeError(f"Invalid component config: {type(component_config)}")
-
-                result = _to_zero_if_nan_or_negative(result)
-
-                outflow_speed_series += result
-
-                components_outflow_speed[
-                    f"{component_config.__class__.__name__}.{col.split('.', 1)[1]}"
-                ] = result
-
-    inflow_speed_series += ((outflow_speed_series * df[delta_t_column_name]) + (
-        df[water_level_capacity_mapping_columns_name.capacity].diff()) * 10 ** 6) / (df[delta_t_column_name])
-
-    inflow_speed_series = _to_zero_if_nan_or_negative(inflow_speed_series)
-    outflow_speed_series = _to_zero_if_nan_or_negative(outflow_speed_series)
-
-    return TJWBResult(
-        datetime=df[required_columns_name.datetime],
-        inflow_speed=inflow_speed_series,
-        outflow_speed=outflow_speed_series,
-        water_level=df[required_columns_name.water_level],
-        capacity=df[water_level_capacity_mapping_columns_name.capacity],
-        components_outflow_speed=components_outflow_speed
-    )
+    return df

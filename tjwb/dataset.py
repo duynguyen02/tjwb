@@ -79,3 +79,8 @@ class Dataset:
     def get_valve_overflows(self) -> Dict[str, Tuple[ComponentConfig, List[List[float]]]]:
         return self._valve_overflows
 
+    def get_capacity(self) -> Optional[List[float]]:
+        return self._capacity
+    
+    def get_custom_outflows(self) -> Dict[str, List[float]]:
+        return self._custom_outflows

@@ -7,16 +7,18 @@ class ComponentConfig:
     height: float
 
 
-from typing import List, Dict, Tuple
+from typing import List, Dict, Optional, Tuple
 from datetime import datetime
 
 class Dataset:
     def __init__(self):
         self._time_series: List[datetime] = []
         self._water_level: List[float] = []
+        self._capacity: Optional[List[float]] = None
         self._pumps: Dict[str, List[float]] = {}
         self._box_culverts: Dict[str, Tuple[ComponentConfig, List[float]]] = {}
         self._valve_overflows: Dict[str, Tuple[ComponentConfig, List[List[float]]]] = {}
+        self._custom_outflows: Dict[str, List[float]] = {}
 
     def time_series(self, time_series: List[datetime]) -> 'Dataset':
         self._time_series = time_series
@@ -24,6 +26,10 @@ class Dataset:
 
     def water_level(self, water_level: List[float]) -> 'Dataset':
         self._water_level = water_level
+        return self
+    
+    def capacity(self, capacity: List[float]):
+        self._capacity = capacity
         return self
 
     def pump(self, pump_id: str, values: List[float]) -> 'Dataset':
@@ -50,6 +56,12 @@ class Dataset:
         if '.' in valve_overflow_id:
             raise ValueError('Valve Overflow ID must not contain dot.')
         self._valve_overflows[valve_overflow_id] = (component_config, values)
+        return self
+    
+    def custom_outflows(self, _id: str, values: List[float]) -> 'Dataset':
+        if '.' in _id:
+            raise ValueError('ID must not contain dot.')
+        self._custom_outflows[_id] = values
         return self
 
     def get_time_series(self) -> List[datetime]:

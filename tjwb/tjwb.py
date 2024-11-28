@@ -4,8 +4,8 @@ from typing import Dict, Optional
 import numpy as np
 import pandas as pd
 
-from .columns_constant import *
-from .dataset import Dataset, ComponentConfig
+from tjwb.columns_constant import *
+from tjwb.dataset import Dataset, ComponentConfig
 
 
 def dataset_to_dataframe(dataset: Dataset):

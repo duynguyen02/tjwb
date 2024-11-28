@@ -4,6 +4,7 @@ WATER_LEVEL = 'WaterLevel'
 PUMP = 'Pump'
 BOX_CULVERT = 'BoxCulvert'
 VALVE_OVERFLOW = 'ValveOverflow'
+CUSTOM = 'Custom'
 CAPACITY = 'Capacity'
 INTERVAL = 'Interval'
 

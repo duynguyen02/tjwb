@@ -71,7 +71,7 @@ def test_map_capacity():
     dataset = create_sample_dataset()
     df = dataset_to_dataframe(dataset)
     water_level_capacity_map = {2.0: 100, 2.1: 200}
-    df = map_capacity(df, water_level_capacity_map, nearest_mapping=True)
+    map_capacity(df, water_level_capacity_map, nearest_mapping=True)
     assert df[CAPACITY].iloc[0] == 100
     assert df[CAPACITY].iloc[1] == 200
 
@@ -98,7 +98,8 @@ def test_calculate_valve_overflow_outflow():
 def test_calculate_pumps_outflow():
     dataset = create_sample_dataset()
     df = dataset_to_dataframe(dataset)
-    df = calculate_pumps_outflow(df)
+    df[OUTFLOW] = 0.0
+    calculate_pumps_outflow(df)
     assert OUTFLOW in df.columns
     assert df[OUTFLOW].iloc[0] == 0.5
     assert df[OUTFLOW].iloc[1] == 0.6
@@ -109,7 +110,7 @@ def test_calculate_box_culverts_outflow():
     dataset = create_sample_dataset()
     df = dataset_to_dataframe(dataset)
     df[OUTFLOW] = 0.0
-    df = calculate_box_culverts_outflow(df, dataset)
+    calculate_box_culverts_outflow(df, dataset)
     assert f"{OUT_BOX_CULVERT}.culvert1" in df.columns
     assert df[OUTFLOW].iloc[0] > 0
 
@@ -119,7 +120,7 @@ def test_calculate_valve_overflows_outflow():
     dataset = create_sample_dataset()
     df = dataset_to_dataframe(dataset)
     df[OUTFLOW] = 0.0
-    df = calculate_valve_overflows_outflow(df, dataset)
+    calculate_valve_overflows_outflow(df, dataset)
     assert f"{OUT_VALVE_OVERFLOW}.overflow1.0" in df.columns
     assert df[OUTFLOW].iloc[0] > 0
 

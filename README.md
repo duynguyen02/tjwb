@@ -83,23 +83,26 @@ dataset = (
     Dataset()
     .time_series([datetime(2023, 1, 1), datetime(2023, 1, 2)])
     .water_level([2.0, 3.0])
-    .pump("pump1", [0.5, 0.6])
-    .pump("pump2", [0.4, 0.4])
-    .box_culvert("culvert1", ComponentConfig(elevation=1.0, height=2.0), [0.7, 0.8])
+    .pump("pump1", [0.5, 0.6]) # (m3/s)
+    .pump("pump2", [0.4, 0.4]) # (m3/s)
+    .box_culvert("culvert1", ComponentConfig(elevation=1.0, height=2.0), [0.7, 0.8]) # (m)
     .valve_overflow(
         "overflow1", ComponentConfig(elevation=1.0, height=2.0), [
-            [0.4, 0.3],  # port 0
-            [0.4, 0.3],  # port 1
-            [0.4, 0.3],  # port 2
+            [0.4, 0.3],  # port 0 (m)
+            [0.4, 0.3],  # port 1 (m)
+            [0.4, 0.3],  # port 2 (m)
         ]
     )
+    .custom_outflows('custom1', [0.4, 0.7]) # v3.1.0 (m3/s)
+    .capacity([2.0, 3.0]) # v3.1.0
 )
 
 result_df = calculate(
     dataset=dataset,
     water_level_capacity_map={2.0: 100, 3.0: 200},
     round_to=None,
-    nearest_mapping=False
+    nearest_mapping=False,
+    capacity_from_dataset_first=True  # v3.1.0 set True if you want to use the capacity in dataset instead of water_level_capacity_map
 )
 ```
 ## License

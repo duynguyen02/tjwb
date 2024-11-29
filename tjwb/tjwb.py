@@ -67,7 +67,6 @@ def get_capacity(water_level: float, water_level_capacity_map: Dict[float, float
 
 
 def map_capacity(df: pd.DataFrame, water_level_capacity_map: Dict[float, float], nearest_mapping: bool):
-    df = df.copy()
     df[CAPACITY] = df[WATER_LEVEL].apply(lambda x: get_capacity(x, water_level_capacity_map, nearest_mapping))
     if df[CAPACITY].isna().any():
         raise ValueError(
@@ -107,7 +106,6 @@ def calculate_valve_overflow_outflow(
 
 
 def calculate_pumps_outflow(df: pd.DataFrame):
-    df = df.copy()
     for index, row in df.iterrows():
         pump_columns = [col for col in df.columns if col.startswith(PUMP)]
         outflow_sum = sum(row[pump] for pump in pump_columns)
@@ -115,7 +113,6 @@ def calculate_pumps_outflow(df: pd.DataFrame):
     return df
 
 def calculate_custom_outflows_outflow(df: pd.DataFrame):
-    df = df.copy()
     for index, row in df.iterrows():
         custom_outflows_columns = [col for col in df.columns if col.startswith(CUSTOM)]
         outflow_sum = sum(row[custom_outflow] for custom_outflow in custom_outflows_columns)
@@ -123,7 +120,6 @@ def calculate_custom_outflows_outflow(df: pd.DataFrame):
     return df
 
 def calculate_box_culverts_outflow(df: pd.DataFrame, dataset: Dataset):
-    df = df.copy()
     for col in df.columns:
         if col.startswith(BOX_CULVERT):
             valve_overflow_id = col.split(".")[1]
@@ -143,7 +139,6 @@ def calculate_box_culverts_outflow(df: pd.DataFrame, dataset: Dataset):
 
 
 def calculate_valve_overflows_outflow(df: pd.DataFrame, dataset: Dataset):
-    df = df.copy()
     for col in df.columns:
         if col.startswith(VALVE_OVERFLOW):
             valve_overflow_id = col.split(".")[1]
@@ -179,17 +174,17 @@ def calculate(
             water_level_capacity_map = {round(key, round_to): value for key, value in water_level_capacity_map.items()}
             df[WATER_LEVEL] = df[WATER_LEVEL].round(round_to)
         
-        df = map_capacity(df, water_level_capacity_map, nearest_mapping)
+        map_capacity(df, water_level_capacity_map, nearest_mapping)
         
     df[INTERVAL] = df[TIME_SERIES].diff().dt.total_seconds().fillna(0)
 
     # # # calculate # # #
     df[OUTFLOW] = 0.0
     
-    df = calculate_pumps_outflow(df)
-    df = calculate_box_culverts_outflow(df, dataset)
-    df = calculate_valve_overflows_outflow(df, dataset)
-    df = calculate_custom_outflows_outflow(df)
+    calculate_pumps_outflow(df)
+    calculate_box_culverts_outflow(df, dataset)
+    calculate_valve_overflows_outflow(df, dataset)
+    calculate_custom_outflows_outflow(df)
     
     df[INFLOW] = ((df[OUTFLOW] * df[INTERVAL]) + (
         df[CAPACITY].diff()) * 10 ** 6) / (df[INTERVAL])

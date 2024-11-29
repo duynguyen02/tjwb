@@ -72,7 +72,6 @@ def map_capacity(df: pd.DataFrame, water_level_capacity_map: Dict[float, float],
         raise ValueError(
             "There are missing values in the 'Capacity' column. Consider setting 'nearest_mapping=True' "
             "to fill missing values with the nearest available capacity.")
-    return df
 
 
 def calculate_box_culvert_outflow(
@@ -109,15 +108,13 @@ def calculate_pumps_outflow(df: pd.DataFrame):
     for index, row in df.iterrows():
         pump_columns = [col for col in df.columns if col.startswith(PUMP)]
         outflow_sum = sum(row[pump] for pump in pump_columns)
-        df.at[index, OUTFLOW] = outflow_sum
-    return df
+        df.at[index, OUTFLOW] += outflow_sum
 
 def calculate_custom_outflows_outflow(df: pd.DataFrame):
     for index, row in df.iterrows():
         custom_outflows_columns = [col for col in df.columns if col.startswith(CUSTOM)]
         outflow_sum = sum(row[custom_outflow] for custom_outflow in custom_outflows_columns)
-        df.at[index, CUSTOM] = outflow_sum
-    return df
+        df.at[index, OUTFLOW] += outflow_sum
 
 def calculate_box_culverts_outflow(df: pd.DataFrame, dataset: Dataset):
     for col in df.columns:
@@ -135,7 +132,6 @@ def calculate_box_culverts_outflow(df: pd.DataFrame, dataset: Dataset):
 
                 df.at[index, outflow_column_name] = outflow
                 df.at[index, OUTFLOW] += outflow
-    return df
 
 
 def calculate_valve_overflows_outflow(df: pd.DataFrame, dataset: Dataset):
@@ -155,7 +151,6 @@ def calculate_valve_overflows_outflow(df: pd.DataFrame, dataset: Dataset):
 
                 df.at[index, outflow_column_name] = outflow
                 df.at[index, OUTFLOW] += outflow
-    return df
 
 
 def calculate(

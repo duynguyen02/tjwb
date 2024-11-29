@@ -22,6 +22,12 @@ def dataset_to_dataframe(dataset: Dataset):
     for valve_overflow_id, (config, values) in dataset.get_valve_overflows().items():
         for i, val in enumerate(values):
             dataset_dict[f'{VALVE_OVERFLOW}.{valve_overflow_id}.{i}'] = val
+            
+    for custom_outflow_id, values in dataset.get_custom_outflows().items():
+        dataset_dict[f'{CUSTOM}.{custom_outflow_id}'] = values
+        
+    if dataset.get_capacity() is not None:
+        dataset_dict[CAPACITY] = dataset.get_capacity()
 
     df = pd.DataFrame(dataset_dict)
     df[TIME_SERIES] = pd.to_datetime(df[TIME_SERIES])
@@ -154,24 +160,29 @@ def calculate(
         dataset: Dataset,
         water_level_capacity_map: Dict[float, float],
         round_to: Optional[int] = None,
-        nearest_mapping: bool = False
+        nearest_mapping: bool = False,
+        capacity_from_dataset_first: bool = False
 ):
     # # # prepare data # # #
     df = dataset_to_dataframe(dataset)
     validate_dataframe(df)
-
-    if round_to is not None:
-        water_level_capacity_map = {round(key, round_to): value for key, value in water_level_capacity_map.items()}
-        df[WATER_LEVEL] = df[WATER_LEVEL].round(round_to)
-
-    df = map_capacity(df, water_level_capacity_map, nearest_mapping)
+    
+    if not capacity_from_dataset_first or dataset.get_capacity() is None:
+        if round_to is not None:
+            water_level_capacity_map = {round(key, round_to): value for key, value in water_level_capacity_map.items()}
+            df[WATER_LEVEL] = df[WATER_LEVEL].round(round_to)
+        
+        df = map_capacity(df, water_level_capacity_map, nearest_mapping)
+        
     df[INTERVAL] = df[TIME_SERIES].diff().dt.total_seconds().fillna(0)
 
     # # # calculate # # #
     df[OUTFLOW] = 0.0
+    
     df = calculate_pumps_outflow(df)
     df = calculate_box_culverts_outflow(df, dataset)
     df = calculate_valve_overflows_outflow(df, dataset)
+    
     df[INFLOW] = ((df[OUTFLOW] * df[INTERVAL]) + (
         df[CAPACITY].diff()) * 10 ** 6) / (df[INTERVAL])
 

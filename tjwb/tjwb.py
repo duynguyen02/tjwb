@@ -114,6 +114,13 @@ def calculate_pumps_outflow(df: pd.DataFrame):
         df.at[index, OUTFLOW] = outflow_sum
     return df
 
+def calculate_custom_outflows_outflow(df: pd.DataFrame):
+    df = df.copy()
+    for index, row in df.iterrows():
+        custom_outflows_columns = [col for col in df.columns if col.startswith(CUSTOM)]
+        outflow_sum = sum(row[custom_outflow] for custom_outflow in custom_outflows_columns)
+        df.at[index, CUSTOM] = outflow_sum
+    return df
 
 def calculate_box_culverts_outflow(df: pd.DataFrame, dataset: Dataset):
     df = df.copy()
@@ -182,6 +189,7 @@ def calculate(
     df = calculate_pumps_outflow(df)
     df = calculate_box_culverts_outflow(df, dataset)
     df = calculate_valve_overflows_outflow(df, dataset)
+    df = calculate_custom_outflows_outflow(df)
     
     df[INFLOW] = ((df[OUTFLOW] * df[INTERVAL]) + (
         df[CAPACITY].diff()) * 10 ** 6) / (df[INTERVAL])
